@@ -1,0 +1,24 @@
+task_1 = {
+   "task": {
+      "task_type" : "regression", #vs. control
+      "function_set": ["and", "or", "xor", "nand", "nor", "mov", "not", "identity"],
+      "arity": arity = {"xor" : 2,"or" : 2, "and": 2, "nand" : 2, "nor" : 2, "not" : 1, "mov" : 1, "identity" : 1},
+      "dataset" : "task/xor_parity", #this is a series of inputs X and outputs Y (mixed arity)
+   },
+   "prior": {
+      "state_checker" : { "on" : True} #whether to include a pre-trained model
+   },
+   "policy_approximator": {
+      "n_samples": NUM_SAMPLES , #basic hyperparameters relevant to training
+      "batch_size": BATCH_SIZE
+   },
+    "policy_gradient_algo": {
+        "gamma": 6,
+        "lr":0.01,
+        "batch_size": 1000,
+        "batch_episodes": 50,
+        "entropy_beta": 9,
+        "avg_reward_len":,
+        "epoch_len":
+    }
+}
