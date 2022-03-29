@@ -1,54 +1,49 @@
-
 import pytorch_lightning as pl
 import logging
 from argparse import ArgumentParser
 import yaml
-from pl_bolts.models.rl import VanillaPolicyGradient
-from models import PolicyGradient
-
-from gym.envs.registration import register
+from models.policy_gradient import  PolicyGradient
+import os
 
 
-parser = ArgumentParser()
+def load_config(config_file: str) -> dict:
+    try:
+        with open(config_file) as file:
+            config = yaml.safe_load(file)
+            logging.log(logging.INFO, f'Running with config {config}')
+            # this dataset is the input, output tuples
+            task_config = config["task"]["dataset"]
+            assert task_config, "Task config missing."
 
-parser.add_argument()
+            # RNN parameters
+            rl_config = config["policy_gradient_algo"]
+            assert rl_config, "General RL config missing"
+            policy_config = rl_config["policy_estimator"]
+            assert policy_config, "Policy estimator config missing."
 
-trainer = pl.Trainer()
-parser = trainer.add_argparse_args(parser)
-args = parser.parse_args()
+            return config
+    except FileNotFoundError:
+        logging.log(logging.INFO, f'{config_file} not found')
+        raise FileNotFoundError(f'{config_file} not found')
 
-config_file = args["config"]
 
-try:
-    with open(config_file) as file:
-        logging.log(logging.INFO, f'Running with config {yaml.dump(file)}')
-        config = yaml.load(file, Loader=yaml.FullLoader)
+if __name__ == "__main__":
+    # parse args
+    parser = ArgumentParser()
 
-        # this dataset is the input, output tuples
-        dataset = config["dataset"]
-        assert dataset, "Dataset config missing."
+    parser.add_argument('--config')
 
-        # RNN parameters
-        rnn_config = config["rnn"]
-        assert rnn_config, "Policy estimator config missing."
-        rl_config = config["policy_gradient_algo"]
-        assert rl_config, "General RL config missing"
-except FileNotFoundError:
-    logging.log(logging.INFO, f'{config_file} not found')
-    raise FileNotFoundError(f'{config_file} not found')
+    trainer = pl.Trainer()
+    parser = trainer.add_argparse_args(parser)
+    args = parser.parse_args()
 
-model = PolicyGradient(config)
-trainer = pl.Trainer(
-    gpus=1,
-    distributed_backend='dp',
-    max_epochs=10000,
-    early_stop_callback=False,
-    val_check_interval=100
-)
+    config = load_config(os.getcwd() + '/' + args.config)
 
-trainer.fit(model)
+    # TODO: have a switch statement here to run model or a benchmark
+    model = PolicyGradient(config)
+    trainer = pl.Trainer(
+        gpus=0,
+        max_epochs=10000
+    )
 
-register(id='fitness-landscape',entry_point='env.FitnessLandscape:FitnessLandscape',)
-vpg = VanillaPolicyGradient("CartPole-v0")
-trainer.fit(vpg)
-
+    trainer.fit(model)

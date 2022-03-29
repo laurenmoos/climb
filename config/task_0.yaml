@@ -1,0 +1,23 @@
+"task":
+  "task_type" : "regression" #vs. control
+  "function_set": ["and", "or", "mov", "not", "identity"]
+  "arity": {"or" : 2, "and": 2,  "not" : 1, "mov" : 1, "identity" : 1}
+  "num_input_registers": 6
+  "num_output_registers": 1
+  "dataset" : "task/6-bit-parity.csv" #this is a series of inputs X and outputs Y (mixed arity)
+  "constraints": []
+
+"policy_gradient_algo":
+    "gamma": 6
+    "lr": 0.01
+    "batch_size": 24
+    "batch_episodes": 50
+    "entropy_beta": 9
+    "avg_reward_len": 1
+    "epoch_len": 1
+    "num_episodes": 500
+    "policy_estimator":
+        "num_layers": 5
+        "sequence_length": 100,
+        "learning_rate": 0.0006
+        "gru_unit_size": 10

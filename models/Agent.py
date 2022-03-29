@@ -1,76 +1,70 @@
-from gym import Env
-from env import ReplayBuffer
 
 import torch
-from torch import nn
 
 import numpy as np
+from data.data_models import Episode
+from env.cockatrice import evaluate
+
 
 class Agent:
     """
-    Base Agent class handeling the interaction with the environment
-    Args:
-        env: training environment
-        replay_buffer: replay buffer storing experiences
+    Encapsulates interactions with the environment.
     """
 
-    def __init__(self, env: Env, replay_buffer: ReplayBuffer) -> None:
+    def __init__(self, env, device, estimator, config):
+
+        self.state = None
         self.env = env
-        self.replay_buffer = replay_buffer
+
+        self.device = device
+
+        self.estimator = estimator
+
+        self.max_sequence_length = config['sequence_length']
+        self.num_layers = config['num_layers']
+        self.gru_unit_size = config['gru_unit_size']
+
         self.reset()
+
+    def reset(self):
+        """ resets environment and updates state """
         self.state = self.env.reset()
 
-    def reset(self) -> None:
-        """ Resents the environment and updates the state"""
-        self.state = self.env.reset()
-
-    def get_action(self, net: Module, epsilon: float, device: str) -> int:
-        """
-        Using the given network, decide what action to carry out
-        using an epsilon-greedy policy
-        Args:
-            net: DQN network
-            epsilon: value to determine likelihood of taking a random action
-            device: current device
-        Returns:
-            action
-        """
-        if np.random.random() < epsilon:
-            action = self.env.action_space.sample()
-        else:
-            state = torch.tensor([self.state])
-
-            if device not in ['cpu']:
-                state = state.cuda(device)
-
-            q_values = net(state)
-            _, action = torch.max(q_values, dim=1)
-            action = int(action.item())
+    def get_action(self, init_state):
+        # TODO: action should be a tuple that contains an action and an action probability
+        action, final_state = self.estimator.sample(self.state[np.newaxis, np.newaxis, :], init_state)
 
         return action
 
     @torch.no_grad()
-    def play_step(self, net: nn.Module, epsilon: float = 0.0, device: str = 'cpu') -> Tuple[float, bool]:
+    def run_episode(self):
         """
-        Carries out a single interaction step between the agent and the environment
-        Args:
-            net: DQN network
-            epsilon: value to determine likelihood of taking a random action
-            device: current device
-        Returns:
-            reward, done
+        Generates a single program via sampling from the action space
+        L of possible instructions via forward pass until max sequence length is reached.
         """
 
-        action = self.get_action(net, epsilon, device)
+        # states: prior tokens, actions: next token, rewards: fitness
+        states, actions, rewards = [], [], []
+        init_states = tuple([] for _ in range(self.num_layers))
 
-        # do step in the environment
-        new_state, reward, done, _ = self.env.step(action)
+        init_state = tuple([np.zeros((1, self.gru_unit_size)) for _ in range(self.num_layers)])
 
-        exp = ReplayBuffer.Experience(self.state, action, reward, done, new_state)
+        for i in range(self.max_sequence_length):
 
-        self.replay_buffer.append(exp)
+            action = self.get_action(init_state)
+            # TODO: in the paper they only compute a reward for the entire sequence
+            next_state, episode_reward, done, _ = self.env.step(action)
 
-        self.state = new_state
-        if done:
-            self.reset()
-        return reward, done
+            states.append(self.state)
+            actions.append(action)
+            rewards.append(episode_reward)
+            [np.concatenate(init_states[i], init_state[i][0], axis=0) for i in range(self.num_layers)]
+
+            init_states = tuple(np.array(init_states[i]) for i in range(self.num_layers))
+
+        # the terminal state will be the completed program
+        candidate_expression = states[-1]
+
+        undiscounted_return = evaluate(candidate_expression)
+        # TODO: we are only concerned with the un-discounted total return of an episode
+        return Episode(np.array(states), np.array(actions), np.array(rewards), undiscounted_return, init_states), done
