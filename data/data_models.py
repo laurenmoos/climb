@@ -1,50 +1,50 @@
-import random
 from collections import namedtuple
 
 
 import numpy as np
 import torch
-import data.constants
+import itertools
 from dataclasses import dataclass
 from torch.nn import functional as F
 
 
 Task = namedtuple('Point', 'function_set arity num_input_registers num_output_registers dataset constraints')
 
+@dataclass(frozen=True)
+class Inst:
+    src:int
+    dst: int
+    op: str
+
+#TODO: should continue to design program representation
 @dataclass
 class Task:
-    function_set:list
-    arity: dict
-    num_input_registers: int
-    num_output_registers: int
-    dataset: str
-    constraints: list
 
-    def instruction_shape(self) -> int:
-        return self.num_input_registers + self.num_output_registers + len(self.function_set)
+    def __init__(self, function_set, num_input_regs, num_output_regs, dataset, constraints):
+        self.function_set = function_set
+        self.num_input_registers = num_input_regs
+        self.num_output_registers = num_output_regs
+        self.dataset = dataset
+        self.constraints = constraints
+        self.instruction_shape = self.num_input_registers * self.num_output_registers * len(self.function_set)
+        self.inst_to_vec, self.vec_to_inst = self.library()
 
-@dataclass
-class Inst:
-    op: str
-    arity: int
-    # let's use the convention that negative indices refer to input
-    dst: int
-    src: int
+    def library(self):
+        a = [range(self.num_input_registers), range(self.num_output_registers), self.function_set]
+        instructions = list(itertools.product(*a))
 
-    def to_vec(self, task: Task):
-        ops_vec = F.one_hot(torch.tensor(task.function_set.index(self.op)), num_classes=8)
-        src_vec = F.one_hot(torch.tensor(self.src), num_classes=task.num_input_registers)
-        dst_vec = F.one_hot(torch.tensor(self.dst), num_classes=task.num_output_registers)
+        L, M = {}, {}
+        for idx, inst in enumerate(instructions):
+            instruction = Inst(inst[0], inst[1], inst[2])
+            L[instruction] = idx
+            M[idx] = instruction
+        return L, M
 
-        return torch.cat([ops_vec, src_vec, dst_vec], dim=0)
+    def inst_to_onehot(self, inst: Inst):
+        one_hot = F.one_hot(torch.tensor(self.inst_to_vec[inst]), num_classes=self.instruction_shape)
+        one_hot = one_hot.type(torch.FloatTensor)
+        return torch.tensor(one_hot, dtype=torch.float)
 
-    @staticmethod
-    def to_vec(task:Task, src: int, dst: int, op:str):
-        ops_vec = F.one_hot(torch.tensor(task.function_set.index(op)), num_classes=8)
-        src_vec = F.one_hot(torch.tensor(src), num_classes=task.num_input_registers)
-        dst_vec = F.one_hot(torch.tensor(dst), num_classes=task.num_output_registers)
-
-        return torch.cat([ops_vec, src_vec, dst_vec], dim=0)
 
 @dataclass
 class Program:

@@ -1,18 +1,15 @@
 import torch
-from torch import nn
-import logging
 
 import pytorch_lightning as pl
 import torch.optim as optim
 
 import os
 from env.experience_source_dataset import ExperienceSourceDataset
-from models.networks import create_mlp, create_gru, ActorCriticAgent, ActorCategorical
+from models.networks import create_mlp, ActorCriticAgent, ActorCategorical
 from data.data_models import Task
 from env.fitness_landscape import FitnessLandscape
 
 from env.cockatrice import evaluate
-
 
 import pandas as pd
 
@@ -56,21 +53,18 @@ class PolicyGradient(pl.LightningModule):
         self.arity = self.task_config["arity"]
         self.dataset = self.task_config["dataset"]
         self.constraints = self.task_config["constraints"]
-
-        self.task = Task(self.function_set, self.arity,  self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints)
-
+        self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints)
+        #TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
         self.env = FitnessLandscape(self.task)
 
-        #TODO: this deserves some more thought
-        input_shape = (self.task.instruction_shape(), )
+        # TODO: while this will likely remain an MLP, it deserves a bit more thought
+        input_shape = (self.task.instruction_shape,)
         self.critic = create_mlp(input_shape, len(self.env.action_space))
 
-        #todo: make this configurable
-        look_back = 1
-        input_shape = ( self.task.instruction_shape(), )
-        #for now: this should be recurrent eventually
-        actor_gru = create_mlp(input_shape,  len(self.env.action_space))
-        self.actor = ActorCategorical(actor_gru)
+        # TODO: replace this with a recurrent policy model
+        input_shape = (self.task.instruction_shape,)
+        actor_model = create_mlp(input_shape, len(self.env.action_space))
+        self.actor = ActorCategorical(actor_model)
 
         self.agent = ActorCriticAgent(self.actor, self.critic)
 
@@ -89,7 +83,7 @@ class PolicyGradient(pl.LightningModule):
         self.avg_ep_len = 0
         self.avg_reward = 0
 
-        self.state = torch.FloatTensor(self.env.reset())
+        self.state = torch.tensor(self.env.reset(), dtype=float)
 
     def configure_optimizers(self) -> tuple:
         """ Initialize Adam optimizer"""
@@ -141,11 +135,11 @@ class PolicyGradient(pl.LightningModule):
 
         input_registers, output_registers = df[df.columns[:self.n_inp_reg]], df[df.columns[:-self.n_out_reg]]
 
-        N = len(input_registers)
+        assert len(input_registers) == len(output_registers)
 
         error = 0
-        for idx, register in input_registers:
-            error += evaluate(candidate_expression, input_registers[idx], output_registers[idx])
+        for inp, out in zip(input_registers, output_registers):
+            error += evaluate(candidate_expression, inp, out)
 
         return 1 - error
 
@@ -167,10 +161,9 @@ class PolicyGradient(pl.LightningModule):
         """
 
         for step in range(self.steps_per_epoch):
-            pi, action, log_prob, value = self.agent(self.state, self.device)
+            pi, action, log_prob, value = self.agent(self.state.float(), self.device)
 
             next_state, reward, done, _ = self.env.step(action.cpu().numpy())
-
             self.episode_step += 1
 
             self.batch_states.append(self.state)
@@ -178,12 +171,9 @@ class PolicyGradient(pl.LightningModule):
             self.batch_logp.append(log_prob)
 
             self.ep_rewards.append(reward)
-            logging.log(logging.WARN,
-                        f'State {self.state} Action {action} Observation {self.env.observation_space}')
 
-            #for now just append the max value
+            # TODO: I believe this should be the product of all of the values of the episode
             self.ep_values.append(torch.max(value))
-
             self.state = torch.FloatTensor(next_state)
 
             epoch_end = step == (self.steps_per_epoch - 1)
@@ -194,7 +184,7 @@ class PolicyGradient(pl.LightningModule):
                 if (terminal or epoch_end) and not done:
                     with torch.no_grad():
                         _, _, _, value = self.agent(self.state, self.device)
-                        last_value = value.item()
+                        last_value = value
                         steps_before_cutoff = self.episode_step
                 else:
                     last_value = 0

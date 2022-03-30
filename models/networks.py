@@ -1,39 +1,27 @@
+import logging
 from typing import Union, Tuple
 
 import torch
 from torch import nn
 from torch.distributions import Categorical, Normal
+from torchvision import models
+from torchsummary import summary
 
 
-def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_sizes: list = [12, 4]):
+def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_sizes: list = [27, 10]):
     """
     Simple Multi-Layer Perceptron network
     """
+    logging.log(logging.WARN, f"Input shap is {input_shape[0]}")
+    torch.set_default_dtype(torch.float64)
     net_layers = []
-    net_layers.append(nn.Linear(input_shape[0], hidden_sizes[0]))
+    net_layers.append(nn.Linear(30, 27))
     net_layers.append(nn.ReLU())
-
-    for i in range(len(hidden_sizes) - 1):
-        net_layers.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-        net_layers.append(nn.ReLU())
-    net_layers.append(nn.Linear(hidden_sizes[-1], n_actions))
-
-    return nn.Sequential(*net_layers)
-
-
-def create_gru(input_shape: Tuple[int, int], n_actions: int, hidden_sizes: list = [12, 4]):
-    net_layers = []
-    net_layers.append(nn.Linear(input_shape[0], hidden_sizes[0]))
+    net_layers.append(nn.Linear(27, 10))
     net_layers.append(nn.ReLU())
-
-    for i in range(len(hidden_sizes) - 1):
-        net_layers.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-        net_layers.append(nn.ReLU())
-    net_layers.append(nn.Linear(hidden_sizes[-1], n_actions))
-
-    return nn.Sequential(
-        *net_layers
-    )
+    net_layers.append(nn.Linear(10, n_actions))
+    mod = nn.Sequential(*net_layers).float()
+    return mod
 
 
 class ActorCategorical(nn.Module):
@@ -53,7 +41,9 @@ class ActorCategorical(nn.Module):
         self.actor_net = actor_net
 
     def forward(self, states):
-        logits = self.actor_net(states)
+        logging.log(logging.WARN, f"State datatype before logits {states.dtype}")
+        logits = self.actor_net(states.float())
+        logging.log(logging.WARN, f"Logits {logits} State shape {logits.shape}")
         pi = Categorical(logits=logits)
         actions = pi.sample()
 
@@ -94,13 +84,15 @@ class ActorCriticAgent(object):
         Returns:
             torch dsitribution and randomly sampled action
         """
+        logging.log(logging.WARN, f"State datatype {state.dtype}")
 
         state = state.to(device=device)
 
+        logging.log(logging.WARN, f"state {state}")
         pi, actions = self.actor_net(state)
         log_p = self.get_log_prob(pi, actions)
 
-        value = self.critic_net(state)
+        value = self.critic_net(state.float())
 
         return pi, actions, log_p, value
 
