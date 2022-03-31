@@ -1,1 +1,5 @@
 .idea/*
+**/__pycache__/
+.ipynb_checkpoints/
+__py_cache__
+lightning_logs/*

@@ -10,7 +10,6 @@ def load_config(config_file: str) -> dict:
     try:
         with open(config_file) as file:
             config = yaml.safe_load(file)
-            logging.log(logging.INFO, f'Running with config {config}')
             # this dataset is the input, output tuples
             task_config = config["task"]["dataset"]
             assert task_config, "Task config missing."
@@ -18,8 +17,6 @@ def load_config(config_file: str) -> dict:
             # RNN parameters
             rl_config = config["policy_gradient_algo"]
             assert rl_config, "General RL config missing"
-            policy_config = rl_config["policy_estimator"]
-            assert policy_config, "Policy estimator config missing."
 
             return config
     except FileNotFoundError:

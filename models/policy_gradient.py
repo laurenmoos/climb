@@ -33,9 +33,6 @@ class PolicyGradient(pl.LightningModule):
         self.max_episode_len = rl_config['num_episodes']
         self.steps_per_epoch = rl_config['batch_size']
 
-        self.lr_actor = 3e-4
-        self.lr_critic = 1e-3
-
         # estimator specific parameters
         policy_config = rl_config['policy_estimator']
 
@@ -43,8 +40,9 @@ class PolicyGradient(pl.LightningModule):
         self.sequence_length = policy_config['sequence_length']
         self.learning_rate = policy_config['learning_rate']
         self.gru_unit_size = policy_config['gru_unit_size']
+        self.lr_actor = policy_config['lr_actor']
+        self.lr_critic = policy_config['lr_critic']
 
-        self.save_hyperparameters()
         # task specific parameters and data loading
         self.task_config = config["task"]
         self.n_inp_reg = self.task_config["num_input_registers"]
@@ -53,8 +51,10 @@ class PolicyGradient(pl.LightningModule):
         self.arity = self.task_config["arity"]
         self.dataset = self.task_config["dataset"]
         self.constraints = self.task_config["constraints"]
+
+        self.save_hyperparameters()
         self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints)
-        #TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
+        # TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
         self.env = FitnessLandscape(self.task)
 
         # TODO: while this will likely remain an MLP, it deserves a bit more thought
@@ -83,7 +83,7 @@ class PolicyGradient(pl.LightningModule):
         self.avg_ep_len = 0
         self.avg_reward = 0
 
-        self.state = torch.tensor(self.env.reset(), dtype=float)
+        self.state = self.env.reset()
 
     def configure_optimizers(self) -> tuple:
         """ Initialize Adam optimizer"""
