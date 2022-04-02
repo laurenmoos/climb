@@ -20,7 +20,6 @@ def load_config(config_file: str) -> dict:
 
             return config
     except FileNotFoundError:
-        logging.log(logging.INFO, f'{config_file} not found')
         raise FileNotFoundError(f'{config_file} not found')
 
 

@@ -1,4 +1,5 @@
 #this is a dummy implementation of the reward function
+import random
 
 import numpy as np
 
@@ -8,7 +9,10 @@ def evaluate(candidate_expression, inputs, outputs):
     completed at the end of the episode, assign a reward using the dataset consisting of
     input output tuples
     '''
-    return rmse(candidate_expression.evaluate(inputs), outputs)
+
+    #TODO: not implemented, waiting on Lucca
+    # error = rmse(candidate_expression.evaluate(inputs), outputs)
+    return random.uniform(1.5, 1.9)
 
 
 def _error(actual: np.ndarray, predicted: np.ndarray):

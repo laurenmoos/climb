@@ -1,7 +1,7 @@
-from torch.utils.data.dataset import T_co
 
 from torch.utils.data import IterableDataset
-from typing import Iterable, Callable
+from typing import Callable
+
 
 class ExperienceSourceDataset(IterableDataset):
     """

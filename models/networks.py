@@ -1,4 +1,3 @@
-import logging
 from typing import Union, Tuple
 
 import torch
@@ -10,9 +9,7 @@ def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_sizes: list = [12
     """
     Simple Multi-Layer Perceptron network
     """
-    net_layers = []
-    net_layers.append(nn.Linear(input_shape[0], hidden_sizes[0]))
-    net_layers.append(nn.ReLU())
+    net_layers = [nn.Linear(input_shape[0], hidden_sizes[0]), nn.ReLU()]
 
     for i in range(len(hidden_sizes) - 1):
         net_layers.append(nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))

@@ -16,32 +16,26 @@ import pandas as pd
 from torch.utils.data import DataLoader
 
 
+# TODO: metric design - batch diversity, buffer diversity, if autoregressive context window diversity esp for critic
 class PolicyGradient(pl.LightningModule):
 
     def __init__(self, config):
+        # TODO: as you experiment, replace these hyperparameters with defaults to pair down a bit
         super().__init__()
         # rl hyper-parameters
         rl_config = config["policy_gradient_algo"]
         self.gamma = rl_config['gamma']
         self.lr = rl_config['lr']
         self.batch_size = rl_config['batch_size']
-        self.batch_episodes = rl_config['batch_episodes']
         self.entropy_beta = rl_config['entropy_beta']
         self.avg_reward_len = rl_config['avg_reward_len']
         self.epoch_len = rl_config['epoch_len']
+        self.nb_optim_iters = rl_config['nb_optim_iters']
+        self.clip_ratio = rl_config['clip_ratio']
         # RL control flow parameters
-        self.max_episode_len = rl_config['num_episodes']
-        self.steps_per_epoch = rl_config['batch_size']
 
-        # estimator specific parameters
-        policy_config = rl_config['policy_estimator']
-
-        self.num_layers = policy_config['num_layers']
-        self.sequence_length = policy_config['sequence_length']
-        self.learning_rate = policy_config['learning_rate']
-        self.gru_unit_size = policy_config['gru_unit_size']
-        self.lr_actor = policy_config['lr_actor']
-        self.lr_critic = policy_config['lr_critic']
+        self.lr_actor = rl_config['lr_actor']
+        self.lr_critic = rl_config['lr_critic']
 
         # task specific parameters and data loading
         self.task_config = config["task"]
@@ -51,15 +45,21 @@ class PolicyGradient(pl.LightningModule):
         self.arity = self.task_config["arity"]
         self.dataset = self.task_config["dataset"]
         self.constraints = self.task_config["constraints"]
+        # An episode is the construction of a vector of instructions / candidate program
+        # for now setting epoch == episode, but might change for recurrent policy network
+        self.sequence_length = self.task_config["sequence_length"]
+        self.steps_per_epoch = self.sequence_length
 
         self.save_hyperparameters()
-        self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints)
+        self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints,
+                         self.sequence_length)
         # TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
         self.env = FitnessLandscape(self.task)
 
         # TODO: while this will likely remain an MLP, it deserves a bit more thought
         input_shape = (self.task.instruction_shape,)
-        self.critic = create_mlp(input_shape, len(self.env.action_space))
+        # critic sampling a random action from the distribution formed by the inner state of the (currently) MLP model
+        self.critic = create_mlp(input_shape, 1)
 
         # TODO: replace this with a recurrent policy model
         input_shape = (self.task.instruction_shape,)
@@ -109,20 +109,32 @@ class PolicyGradient(pl.LightningModule):
 
         return pi, action, value
 
-    def calc_advantage(self, rewards: list, values: list, last_value: float) -> list:
-        """Calculate the advantage given rewards, state values, and the last value of episode
+    # setting default to no discount as the reward isn't discounted in symbolic optimization paper
+    # TODO: leaving method as is in case we end up calculating a relevant incremental reward
+    def discount_rewards(self, rewards, discount=1.0):
+        """Calculate the discounted rewards of all rewards in list
         Args:
-            rewards: list of episode rewards
-            values: list of state values from critic
-            last_value: value of last state of episode
+            rewards: list of rewards/advantages
         Returns:
-            list of advantages
+            list of discounted rewards/advantages
         """
+        assert isinstance(rewards[0], float)
+
+        cumul_reward = []
+        sum_r = 0.0
+
+        for r in reversed(rewards):
+            sum_r = (sum_r * discount) + r
+            cumul_reward.append(sum_r)
+
+        return list(reversed(cumul_reward))
+
+    def calc_advantage(self, rewards: list, values: list, last_value: float) -> list:
         rews = rewards + [last_value]
         vals = values + [last_value]
         # GAE
         delta = [rews[i] + self.gamma * vals[i + 1] - vals[i] for i in range(len(rews) - 1)]
-        adv = self.discount_rewards(delta, self.gamma * self.lam)
+        adv = self.discount_rewards(delta)
 
         return adv
 
@@ -137,11 +149,11 @@ class PolicyGradient(pl.LightningModule):
 
         assert len(input_registers) == len(output_registers)
 
-        error = 0
+        cum_error = []
         for inp, out in zip(input_registers, output_registers):
-            error += evaluate(candidate_expression, inp, out)
+            cum_error.append(evaluate(candidate_expression, inp, out))
 
-        return 1 - error
+        return cum_error
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
@@ -155,11 +167,8 @@ class PolicyGradient(pl.LightningModule):
 
     def train_batch(self, ) -> tuple:
         """
-        Contains the logic for generating trajectory data to train policy and value network
-        Yield:
-           Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
+        train an actor/critic agent on a batch of candidate programs evaluated for fit on a sample of input/output tuples
         """
-
         for step in range(self.steps_per_epoch):
             pi, action, log_prob, value = self.agent(self.state.float(), self.device)
 
@@ -172,12 +181,13 @@ class PolicyGradient(pl.LightningModule):
 
             self.ep_rewards.append(reward)
 
-            # TODO: I believe this should be the product of all of the values of the episode
-            self.ep_values.append(torch.max(value))
+            # value is a learned sample via the critic network so we can expect a float scalar here
+            self.ep_values.append(value.item())
             self.state = torch.FloatTensor(next_state)
 
             epoch_end = step == (self.steps_per_epoch - 1)
-            terminal = len(self.ep_rewards) == self.max_episode_len
+            # has a reward been collected for each instruction added to the sequence
+            terminal = len(self.ep_rewards) == self.sequence_length
 
             if epoch_end or done or terminal:
                 # if trajectory ends abtruptly, boostrap value of next state
@@ -190,7 +200,7 @@ class PolicyGradient(pl.LightningModule):
                     last_value = 0
                     steps_before_cutoff = 0
 
-                # discounted cumulative reward
+                # cumulative reward
                 self.batch_qvals += self._compute_episode_rewards(last_value)
                 # advantage
                 self.batch_adv += self.calc_advantage(self.ep_rewards, self.ep_values, last_value)

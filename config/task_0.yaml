@@ -6,20 +6,16 @@
   "num_output_registers": 1
   "dataset" : "task/6-bit-parity.csv" #this is a series of inputs X and outputs Y (mixed arity)
   "constraints": []
+  "sequence_length": 100
 
 "policy_gradient_algo":
     "gamma": 6
     "lr": 0.01
     "batch_size": 24
-    "batch_episodes": 50
     "entropy_beta": 9
     "avg_reward_len": 1
     "epoch_len": 1
-    "num_episodes": 500
-    "policy_estimator":
-        "lr_actor": 0.00003
-        "lr_critic": 0.0001
-        "num_layers": 5
-        "sequence_length": 100,
-        "learning_rate": 0.0006
-        "gru_unit_size": 10
+    "lr_actor": 0.00003
+    "lr_critic": 0.0001
+    "nb_optim_iters": 4
+    "clip_ratio": 0.2
