@@ -7,7 +7,7 @@ import os
 from env.experience_source_dataset import ExperienceSourceDataset
 from models.networks import create_mlp, ActorCriticAgent, ActorCategorical
 from data.data_models import Task
-from env.fitness_landscape import FitnessLandscape
+from env.fitness_landscape import VirtualMachine
 
 from env.cockatrice import evaluate
 
@@ -54,7 +54,7 @@ class PolicyGradient(pl.LightningModule):
         self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints,
                          self.sequence_length)
         # TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
-        self.env = FitnessLandscape(self.task)
+        self.env = VirtualMachine(self.task)
 
         # TODO: while this will likely remain an MLP, it deserves a bit more thought
         input_shape = (self.task.instruction_shape,)
