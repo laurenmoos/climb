@@ -1,0 +1,11 @@
+name: climb_dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - torchvision
+#might have to change pytorch version dependening on platform / M1 problems :(
+  - pytorch=1.10.2
+  - gym
+  - pytorch-lightning
+prefix: /Users/lauren/mambaforge/envs/pytorch_env
