@@ -7,9 +7,9 @@ import os
 from env.experience_source_dataset import ExperienceSourceDataset
 from models.networks import create_mlp, ActorCriticAgent, ActorCategorical
 from data.data_models import Task
-from env.fitness_landscape import VirtualMachine
+from env.linear_vm import VirtualMachine
 
-from env.cockatrice import evaluate
+from env.compiler import evaluate
 
 import pandas as pd
 

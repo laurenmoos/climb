@@ -5,38 +5,56 @@ import torch
 import itertools
 from dataclasses import dataclass
 from torch.nn import functional as F
+from enum import Enum
+
+import random
+
+
+class OPSTRING(Enum):
+    OR = 'or'
+    AND = 'and'
+    NOT = 'not'
+    MOV = 'mov'
+    IDENTITY = 'identity'
+
+
+#TODO: need another data model candidate expression that encapsulates atttributes and function logic
+
+
+@dataclass(frozen=True)
+class Op:
+    str: str
+    fx: function
+    arity: int
+
 
 @dataclass(frozen=True)
 class Inst:
     src: int
     dst: int
-    op: str
+    op: Op
 
+    #TODO: ideally task would encapsulate any constructors for instruction
+    # TODO create an instructor that parses a string of src, dst, op
     def __eq__(self, other):
-        return self.op == other.op and self.arity == other.arity and self.dst == other.dst and self.src == other.src
+        return self.op == other.op and self.op.arity == other.arity and self.dst == other.dst and self.src == other.src
 
-#TODO: this appears to be a to string method
+    # TODO: this appears to be a to string method
 
-    def __str__(self) -> str:
-        return super().__str__()
-        if inst.op == 'identity' ? "mov" else inst.op
-        regtype(x) = x < 0 ? 'D': 'R'
+    def reg_type(self, x):
+        return 'D' if x < 0 else 'R'
 
-        xs = ''
-        if inst.arity == 2:
-            xs = ''.join( ["%c[%02d] ← %c[%02d] %s %c[%02d]", regtype(inst.dst), inst.dst, regtype(inst.dst),
-            inst.dst, op_str, regtype(inst.src), abs(inst.src) ] )
+    def __str__(self):
+        op_str = "mov" if self.op == 'identity' else self.op
 
-        elif inst.arity == 1:
-            xs = ''.join(["%c[%02d] ← %s %c[%02d]",
-            regtype(inst.dst),
-            inst.dst,
-            op_str,
-            regtype(inst.src),
-            abs(inst.src))
+        dst_reg, dst_src = self.reg_type(self.dst), self.reg_type(self.src)
+        if self.op.arity == 2:
+            xs = ''.join(["%c[%02d] ← %c[%02d] %s %c[%02d]", dst_reg, self.dst, self.reg_type(self.dst),
+                          self.dst, op_str, self.reg_type(self.src), abs(self.src)])
+        elif self.op.arity == 1:
+            xs = ''.join(["%c[%02d] ← %s %c[%02d]", dst_reg, self.dst, op_str, dst_src, abs(self.src)])
         else:
-            xs = ''.join("%c[%02d] ← %s", regtype(inst.dst), inst.dst, inst.op()))
-        assert xs
+            xs = ''.join(["%c[%02d] ← %s", dst_reg, self.dst, self.op])
         return xs
 
 
@@ -44,15 +62,16 @@ class Inst:
 @dataclass
 class Task:
 
-    def __init__(self, function_set, num_input_regs, num_output_regs, dataset, constraints, sequence_length):
+    def __init__(self, function_set, num_input_regs, num_output_regs, dataset, constraints, sequence_length, arity):
         self.function_set = function_set
         self.num_input_registers = num_input_regs
         self.num_output_registers = num_output_regs
         self.dataset = dataset
         self.constraints = constraints
-        self.instruction_shape = self.num_input_registers * self.num_output_registers * len(self.function_set)
+        self.instruction_shape = self.number_of_possible_insts()
         self.inst_to_vec, self.vec_to_inst = self.library()
         self.sequence_length = sequence_length
+        self.arity = arity
 
     def library(self):
         a = [range(self.num_input_registers), range(self.num_output_registers), self.function_set]
@@ -70,31 +89,41 @@ class Task:
         one_hot = one_hot.type(torch.FloatTensor)
         return torch.tensor(one_hot, dtype=torch.float)
 
-    def random_inst(ops: list, num_data=1) -> Inst:
+    def random_inst(self, ops: list, num_data=1) -> Inst:
         registers = range(1, num_data)
         # case in which every register is writeable
         data = range(1, num_data)
 
-        op = random.choice(ops)
-        arity = lookup_arity(op)
+        # construct the operation, this can probably be made a bit cleaner
+        op_string_to_ops = {OPSTRING.OR: np.bitwise_or, OPSTRING.AND: np.bitwise_and,
+                            OPSTRING.NOT: np.bitwise_not,
+                            OPSTRING.MOV: lambda i, j: (j, i), OPSTRING.IDENTITY: lambda x: x}
+        op_str = random.choice(self.function_set)
+        op = Op(op_str, op_string_to_ops[op_str], self.arity[op_str])
         dst = random.choice(data)
-        src = random.choice(registers) if random.choice([True, False]) else -1 * random.choice(data))
-        return Inst(eval(op), arity, dst, src)
+        src = random.choice(self.num_input_registers) if random.choice([True, False]) else -1 * random.choice(
+            self.num_output_registers)
+        return Inst(src, dst, op)
 
-    def random_program(n: int, ops: list, num_data=1):
-        return np.array([random_inst(ops, num_data) for range(1, n)])
+    def random_program(self, n: int, ops: list, num_data=1):
+        return np.array([self.random_inst(ops, num_data) for i in range(1, n)])
 
     ## How many possible Insts are there, for N inputs?
     ## Where there are N inputs, there are 2N possible src values and N possible dst
     ## arity is fixed with op, so there are 4 possible op values
 
-    def number_of_possible_programs(n_input, n_reg, max_len):
-        number_of_possible_insts = lambda n_input, n_reg, ops: n_input * (n_input + n_reg) * length(ops)
-        return sum([number_of_possible_insts(n_input, n_reg) ^ i for i in range(1, max_len)])
+    def number_of_possible_insts(self):
+        return self.num_input_registers * (self.num_input_registers + self.num_output_registers) * len(
+            self.function_set)
 
-    def number_of_possible_programs(task: Task):
-        number_of_possible_programs(
-            config.genotype.data_n,
-            config.genotype.registers_n,
-            config.genotype.max_len,
-        )
+    def number_of_possible_programs(self):
+        return sum([self.number_of_possible_insts() ^ i for i in range(1, self.sequence_length)])
+
+    def constraint(self, action):
+        return self.semantic_intron(action)
+
+    # TODO: make this insitu constraints
+    def semantic_intron(self, action) -> bool:
+        # TODO: alternative construction for an action string
+        inst = Inst(action)
+        return inst.op in ['and', 'or', 'mov'] and inst.src == inst.dst
