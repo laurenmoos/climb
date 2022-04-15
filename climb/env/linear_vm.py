@@ -1,13 +1,14 @@
 import torch
 from gym import Env
 import numpy as np
-from data.data_models import Task
+from data_models import Inst, Task
+from scipy.sparse import coo_matrix
 
 
-class FitnessLandscape(Env):
+class VirtualMachine(Env):
 
     def __init__(self, task: Task):
-        super(FitnessLandscape, self).__init__()
+        super(VirtualMachine, self).__init__()
 
         self.task = task
 
@@ -29,12 +30,20 @@ class FitnessLandscape(Env):
         # initialize steps left
         self.steps_left = self.sequence_length
 
+        # this is mutated every episode
+        reg = np.zeros(self.task.num_output_registers)
+        data = np.zeros(self.task.num_input_registers)
+        self.program_state = coo_matrix((data, (reg, data)), shape=(reg.shape[0], data.shape[0])).toarray()
+
     def step(self, action: np.ndarray):
         episode_terminated = False
 
         action = self.task.inst_to_onehot(self.action_space[int(action)])
 
-        # TODO: what to include in the context window/observation space is a critical algorithm design decision
+        if not self.task.constraint(action):
+            # in this case the action is invalid and we do not return it as part of the episode
+            return None, None, None, []
+
         self.observation_space = action
         # since the paper only rewards expressions once they are constructed, this is a dummy reward
         reward = 0
@@ -57,3 +66,6 @@ class FitnessLandscape(Env):
         # return the initial set of observations (vector with observation_shape number of empty
         # instructions
         return torch.empty(self.observation_shape, dtype=torch.float)
+
+    def arity(self, inst: Inst) -> int:
+        return self.task.arity[inst.op]

@@ -1,8 +1,7 @@
 import pytorch_lightning as pl
-import logging
 from argparse import ArgumentParser
 import yaml
-from models.policy_gradient import  PolicyGradient
+from policy_gradient import  PolicyGradient
 import os
 
 

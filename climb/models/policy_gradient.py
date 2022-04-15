@@ -4,12 +4,12 @@ import pytorch_lightning as pl
 import torch.optim as optim
 
 import os
-from env.experience_source_dataset import ExperienceSourceDataset
-from models.networks import create_mlp, ActorCriticAgent, ActorCategorical
-from data.data_models import Task
-from env.fitness_landscape import FitnessLandscape
+from experience_source_dataset import ExperienceSourceDataset
+from networks import create_mlp, ActorCriticAgent, ActorCategorical
+from data_models import Task
+from climb.linear_vm import VirtualMachine
 
-from env.cockatrice import evaluate
+from compiler import evaluate
 
 import pandas as pd
 
@@ -37,7 +37,7 @@ class PolicyGradient(pl.LightningModule):
         self.lr_actor = rl_config['lr_actor']
         self.lr_critic = rl_config['lr_critic']
 
-        # task specific parameters and data loading
+        # task specific parameters and test_data loading
         self.task_config = config["task"]
         self.n_inp_reg = self.task_config["num_input_registers"]
         self.n_out_reg = self.task_config["num_output_registers"]
@@ -54,7 +54,7 @@ class PolicyGradient(pl.LightningModule):
         self.task = Task(self.function_set, self.n_inp_reg, self.n_out_reg, self.dataset, self.constraints,
                          self.sequence_length)
         # TODO: will be interesting experiment if there is some kind of diversity metric or incremental reward
-        self.env = FitnessLandscape(self.task)
+        self.env = VirtualMachine(self.task)
 
         # TODO: while this will likely remain an MLP, it deserves a bit more thought
         input_shape = (self.task.instruction_shape,)
@@ -95,7 +95,7 @@ class PolicyGradient(pl.LightningModule):
     def optimizer_step(self, *args, **kwargs):
         """
         Run 'nb_optim_iters' number of iterations of gradient descent on actor and critic
-        for each data sample.
+        for each test_data sample.
         """
         for i in range(self.nb_optim_iters):
             super().optimizer_step(*args, **kwargs)
