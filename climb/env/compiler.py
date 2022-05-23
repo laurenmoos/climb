@@ -2,9 +2,10 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from collections import deque
+from data_models import  Inst
 
 
-def execute(code, input_data, num_registers, num_data_registers, make_trace):
+def execute(code, input_data, out_registers, num_registers, make_trace):
     """
     :param code: vector of instructions in prefix notation
     :param input_data: binary input vector with size == number of test_data registers
@@ -14,50 +15,45 @@ def execute(code, input_data, num_registers, num_data_registers, make_trace):
     :return: state of output registers after program is executed and optional call stack
     """
     # now it is evaluating columns of instruction? not sure
-    return _execute_vec(code, input_data, num_registers, num_data_registers, make_trace)
+    return _execute_vec(code, input_data, num_registers, out_registers, make_trace)
 
 
-def _execute_vec(code, input_data, num_registers, num_data_registers, make_trace):
-    reg = np.zeros(num_registers)
+def _initialize_with_input(input_data, num_registers, num_data_registers):
 
-    print(f"Input test_data is {input_data}")
-    assert input_data <= num_data_registers
-    data = np.array(input_data)
-    regs = coo_matrix((data, (reg, data)), shape=(reg.shape[0], data.shape[0]))
+    reg = input_data
+    return reg
 
+
+def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
     steps = 0
 
     call_stack = deque()
 
-    diff = regs
+    regs = _initialize_with_input(input_data, num_registers, out_registers)
+
     for (pc, inst) in enumerate(code):
         # this operation has side effects on regs
-        diff = _evaluate_inst_vec(inst, diff)
+        out = _evaluate_inst_vec(inst, regs)
 
         if make_trace:
-            call_stack.appendleft(diff.col)
+            call_stack.appendleft(out)
         steps += 1
 
     # returns the output values of the program and optionally the trace
     return regs, call_stack
 
 
-def _evaluate_inst_vec(inst, regs):
-    print(f"Instruction Source {inst.src} Instruction dst {inst.dst} Instruction Op {inst.op.program_str}")
+def _evaluate_inst_vec(inst: Inst, regs):
     # regs is an adjacency list with rows being the source registers and columns the writeable registers
-    s_regs, d_regs = regs.row, regs.col
-    print(f"Source Register {s_regs} Data Registers {d_regs}")
+
     if inst.op.arity == 2:
-        args = [loc(inst.dst, d_regs), loc(inst.src, s_regs)]
+        args = [loc(inst.dst, regs), loc(inst.src, regs)]
     elif inst.op.arity == 1:
-        args = [loc(inst.src, s_regs)]
+        args = [loc(inst.src, regs)]
     else:
         args = inst.op.fx([])
-    print(f"Args are {args} Passed to Operation {str(inst.op.fx)}")
-    d_regs[inst.dst - 1] = inst.op.fx(*args)
-
-    regs.col = d_regs
-    return regs
+    regs[inst.dst - 1] = inst.op.fx(*args)
+    return regs[inst.dst - 1]
 
 
 def loc(dst, data):

@@ -1,50 +1,57 @@
-from constants import op_string_to_ops, OPSTRING, arity
+from constants import op_string_to_ops, OPSTRING, arity_dict
 
 
-# TODO: make this insitu constraints
-def semantic_intron(self, action) -> bool:
+def semantic_intron(inst) -> bool:
     # TODO: alternative construction for an action string
-    inst = Inst.from_string(action)
     return inst.op in [OPSTRING.AND, OPSTRING.OR, OPSTRING.MOV] and inst.src == inst.dst
 
 
 # TODO: need another test_data model candidate expression that encapsulates atttributes and function logic
 class Op:
 
-    def __init__(self, program_str, fx, arity):
-        self.program_str = program_str
+    def __init__(self, op_str, fx, arity):
+        self.op_str = op_str
         self.fx = fx
         self.arity = arity
+
+    @staticmethod
+    def from_string(op_str):
+        op_str = OPSTRING(op_str)
+        return Op(op_str, op_string_to_ops[op_str], arity_dict[op_str])
 
 
 class Inst:
 
-    def __init__(self, src: int, dst: int, op: Op):
+    def __init__(self, src: int, dst: int, op: str):
         self.src = src
         self.dst = dst
-        self.op = op
+        self.op = Op.from_string(op)
 
     @staticmethod
-    def from_string(str):
+    def from_string(inst_str):
         """
-        :param str: in polish notation
+        :param inst_str: in polish notation
         :return: Inst instance
         """
-        tokens = str.split(" ")
-        op_str = OPSTRING(tokens[0])
-        op = Op(op_str, op_string_to_ops[op_str], arity[op_str])
+        tokens = inst_str.split(" ")
         # Lucca uses Hungarian notation
-        return Inst(int(tokens[2]), int(tokens[1]), op)
+        return Inst(int(tokens[2]), int(tokens[1]), tokens[0])
 
-    # TODO: ideally task would encapsulate any constructors for instruction
-    # TODO create an instructor that parses a string of src, dst, op
     def __eq__(self, other):
-        return self.op == other.op and self.op.arity == other.arity and self.dst == other.dst and self.src == other.src
+        return self.op == other.op \
+               and self.op.arity == other.arity_dict \
+               and self.dst == other.dst \
+               and self.src == other.src
 
-    # TODO: this appears to be a to string method
+    def __str__(self):
+        """
+        :return: string representation of instructions in polish notation
+        """
+        pr_print = {"OP:": self.op.op_str, "SRC": self.src, "DST": self.dst}
+        return str(pr_print)
 
-    def reg_type(self, x):
-        return 'D' if x < 0 else 'R'
+    def __hash__(self):
+        return hash((self.op, self.src, self.dst))
 
 
 class CandidateExpression:
@@ -78,6 +85,6 @@ class CandidateExpression:
         """
         inst_strs = []
         for inst in self.code:
-            inst_strs.append(''.join([str(inst.op), str(inst.src), str(inst.dst)]))
+            inst_strs.append(str(inst))
 
         return ''.join(inst_strs)

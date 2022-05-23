@@ -1,19 +1,19 @@
-import numpy as np
 import torch
 import itertools
-from data_models import Inst, Op, semantic_intron
+from env.data_models import Inst, semantic_intron
 from torch.nn import functional as F
-from constants import op_string_to_ops
-
-import random
 
 
 class Task:
+    """
+    Initialized only once from configuration, task parameterizes search by fixing the machine architecture, as well
+    as problem specific characteristics such as max sequence length, function set etc.
+    """
 
-    def __init__(self, function_set, num_input_regs, num_output_regs, dataset, constraints, sequence_length, arity):
+    def __init__(self, function_set, num_regs, num_data_regs, dataset, constraints, sequence_length, arity):
         self.function_set = function_set
-        self.num_input_registers = num_input_regs
-        self.num_output_registers = num_output_regs
+        self.num_regs = num_regs
+        self.num_data_regs = num_data_regs
         self.dataset = dataset
         self.constraints = constraints
         self.instruction_shape = self.number_of_possible_insts()
@@ -22,43 +22,41 @@ class Task:
         self.arity = arity
 
     def index_mappings(self):
-        a = [range(self.num_input_registers), range(self.num_output_registers), self.function_set]
+        """
+        :return: mapping and reverse mapping between instructions and their one-hot encoded index
+        note: this is for a very simple one-hot embedding approach
+        """
+        #TODO: this should be all regsiters times the number of executable regs - maybe minus introns
+        a = [range(self.num_regs), range(self.num_data_regs), self.function_set]
         instructions = list(itertools.product(*a))
 
-        L, M = {}, {}
+        l, m = {}, {}
         for idx, inst in enumerate(instructions):
             instruction = Inst(inst[0], inst[1], inst[2])
-            L[instruction] = idx
-            M[idx] = instruction
-        return L, M
+            l[instruction] = idx
+            m[idx] = instruction
+        return l, m
 
-    def inst_to_onehot(self, inst: Inst):
-        one_hot = F.one_hot(torch.tensor(self.inst_to_vec[inst]), num_classes=self.instruction_shape)
+    def number_of_possible_insts(self):
+        """
+        :return: number of possible instructions given the machine architecture and the function set
+        """
+        return self.num_regs * (self.num_regs + self.num_data_regs) * len( self.function_set)
+
+    # TODO: improve the instruction embedding
+    def inst_to_onehot(self, inst_offset: int):
+        """
+        :return: naive one-hot encoded embedding of any possible instruction given the task
+        """
+        one_hot = F.one_hot(torch.tensor(inst_offset), num_classes=self.instruction_shape)
         one_hot = one_hot.type(torch.FloatTensor)
         return torch.tensor(one_hot, dtype=torch.float)
 
-    def random_inst(self, ops: list, num_data=1) -> Inst:
-        registers = range(1, num_data)
-        # case in which every register is writeable
-        data = range(1, num_data)
-
-        op_str = random.choice(self.function_set)
-        op = Op(op_str, op_string_to_ops[op_str], self.arity[op_str])
-        dst = random.choice(data)
-        src = random.choice(self.num_input_registers) if random.choice([True, False]) else -1 * random.choice(
-            self.num_output_registers)
-        return Inst(src, dst, op)
-
-    def random_program(self, n: int, ops: list, num_data=1):
-        return np.array([self.random_inst(ops, num_data) for i in range(1, n)])
-
-    def number_of_possible_insts(self):
-        return self.num_input_registers * (self.num_input_registers + self.num_output_registers) * len(self.function_set)
-
-    def number_of_possible_programs(self):
-        return sum([self.number_of_possible_insts() ^ i for i in range(1, self.sequence_length)])
-
-    def constraint(self, action):
-        return semantic_intron(action)
-
-
+    @staticmethod
+    def constraint(action):
+        """
+        :return: is a given action (instruction) is an intron
+        this is in an in-situ constraint to produce programs with only meaningful instructions
+        for now: ones that do not contain instructions that are semantic introns
+        """
+        return not semantic_intron(action)

@@ -2,26 +2,35 @@ from unittest import TestCase
 import pandas as pd
 from data_models import CandidateExpression
 from compiler import execute
+import json
 import numpy as np
-
-COLNAMES = ['num_data', 'num_registers', 'output_registers', 'program', 'num_cases', 'input_data', 'output']
-
-df = pd.read_csv('test_data/data.csv', index_col=False, names=COLNAMES)
 
 
 class Test(TestCase):
 
     # TODO: this test currently failing due to data issues
     def test_execute(self):
-        for index, row in df.iterrows():
-            program_string = row['program']
-            print(program_string)
-            program = CandidateExpression.from_string(program_string)
+        FILE_NAME = "sample.json"
+        file = open(FILE_NAME)
+        actuals = json.load(file)
 
-            input_data = np.fromstring(row['input_data'], sep=' ')
-            xs = np.array(input_data, dtype=int)
+        config = actuals["config"]
+        code_length, registers, num_data, out = config["code length"], \
+                                                config["registers"], \
+                                                config["num_data"],  \
+                                                config["out"]
 
-            n = row["num_data"]
-            input_data = np.array(xs).reshape((2 ^ n, n))
 
-            execute(program, input_data, row['input_data'], row['num_registers'], True)
+        code = ';'.join(actuals["code"])
+        print(code)
+
+        #trace instruction by isntruction
+        program_string = code[0]
+        program = CandidateExpression.from_string(program_string)
+
+        data = actuals["data"]
+        xs = np.array(data, dtype=bool)
+        print(f"Data is {xs} with shape {xs.shape}")
+
+        print(execute(program, xs, out, registers, True))
+        file.close()

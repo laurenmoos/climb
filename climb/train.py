@@ -1,23 +1,23 @@
 import pytorch_lightning as pl
 from argparse import ArgumentParser
 import yaml
-from policy_gradient import  PolicyGradient
+from models.policy_gradient import PolicyGradient
 import os
 
 
 def load_config(config_file: str) -> dict:
     try:
         with open(config_file) as file:
-            config = yaml.safe_load(file)
-            # this dataset is the input, output tuples
-            task_config = config["task"]["dataset"]
+            # TODO: eventually just use args as yaml is kind of overkill
+            run_config = yaml.safe_load(file)
+
+            task_config = run_config["task"]["dataset"]
             assert task_config, "Task config missing."
 
-            # RNN parameters
-            rl_config = config["policy_gradient_algo"]
+            rl_config = run_config["policy_gradient_algo"]
             assert rl_config, "General RL config missing"
 
-            return config
+            return run_config
     except FileNotFoundError:
         raise FileNotFoundError(f'{config_file} not found')
 

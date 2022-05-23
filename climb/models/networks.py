@@ -1,8 +1,19 @@
-from typing import Union, Tuple
+from typing import Tuple
 
 import torch
 from torch import nn
-from torch.distributions import Categorical, Normal
+from torch.distributions import Categorical
+
+
+def get_log_prob(pi: Categorical, actions: torch.Tensor):
+    """
+    Args:
+        pi: torch distribution
+        actions: actions taken by distribution
+    Returns:
+        log probability of the action under pi
+    """
+    return pi.log_prob(actions)
 
 
 def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_sizes: list = [128, 128]):
@@ -24,13 +35,7 @@ class ActorCategorical(nn.Module):
     Policy network, for discrete action spaces, which returns a distribution
     and an action given an observation
     """
-
     def __init__(self, actor_net):
-        """
-        Args:
-            input_shape: observation shape of the environment
-            n_actions: number of discrete actions available in the environment
-        """
         super().__init__()
 
         self.actor_net = actor_net
@@ -41,18 +46,6 @@ class ActorCategorical(nn.Module):
         actions = pi.sample()
 
         return pi, actions
-
-    def get_log_prob(self, pi: Categorical, actions: torch.Tensor):
-        """
-        Takes in a distribution and actions and returns log prob of actions
-        under the distribution
-        Args:
-            pi: torch distribution
-            actions: actions taken by distribution
-        Returns:
-            log probability of the acition under pi
-        """
-        return pi.log_prob(actions)
 
 
 class ActorCriticAgent(object):
@@ -72,30 +65,17 @@ class ActorCriticAgent(object):
         Takes in the current state and returns the agents policy, sampled
         action, log probability of the action, and value of the given state
         Args:
-            states: current state of the environment
+            state: current state of the environment
             device: the device used for the current batch
         Returns:
             torch dsitribution and randomly sampled action
         """
+
         state = state.to(device=device)
 
         pi, actions = self.actor_net(state)
-        log_p = self.get_log_prob(pi, actions)
+        log_p = get_log_prob(pi, actions)
 
         value = self.critic_net(state.float())
 
         return pi, actions, log_p, value
-
-    def get_log_prob(self,
-                     pi: Union[Categorical, Normal],
-                     actions: torch.Tensor) -> torch.Tensor:
-        """
-        Takes in the current state and returns the agents policy, a sampled
-        action, log probability of the action, and the value of the state
-        Args:
-            pi: torch distribution
-            actions: actions taken by distribution
-        Returns:
-            log probability of the acition under pi
-        """
-        return self.actor_net.get_log_prob(pi, actions)

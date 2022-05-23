@@ -1,0 +1,8 @@
+numpy~=1.22.2
+scipy~=1.8.0
+pandas~=1.4.1
+gym~=0.21.0
+typing~=3.7.4.3
+pyyaml~=6.0
+setuptools~=59.5.0
+pytorch~=1.10.2
