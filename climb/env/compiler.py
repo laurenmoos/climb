@@ -2,7 +2,15 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from collections import deque
-from data_models import  Inst
+from data_models import Inst
+
+
+def iloc(dst, data):
+    return abs(dst) % abs(len(data))
+
+
+def loc(dst, data):
+    return data[iloc(dst, data)]
 
 
 def execute(code, input_data, out_registers, num_registers, make_trace):
@@ -14,12 +22,10 @@ def execute(code, input_data, out_registers, num_registers, make_trace):
     :param make_trace: boolean indicating whether an execution trace should be collected
     :return: state of output registers after program is executed and optional call stack
     """
-    # now it is evaluating columns of instruction? not sure
     return _execute_vec(code, input_data, num_registers, out_registers, make_trace)
 
 
 def _initialize_with_input(input_data, num_registers, num_data_registers):
-
     reg = input_data
     return reg
 
@@ -40,7 +46,7 @@ def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
         steps += 1
 
     # returns the output values of the program and optionally the trace
-    return regs, call_stack
+    return regs[:, out_registers], call_stack
 
 
 def _evaluate_inst_vec(inst: Inst, regs):
@@ -52,9 +58,5 @@ def _evaluate_inst_vec(inst: Inst, regs):
         args = [loc(inst.src, regs)]
     else:
         args = inst.op.fx([])
-    regs[inst.dst - 1] = inst.op.fx(*args)
-    return regs[inst.dst - 1]
-
-
-def loc(dst, data):
-    return data[abs(dst) % abs(len(data))]
+    regs[inst.dst] = inst.op.fx(*args)
+    return regs[inst.dst]

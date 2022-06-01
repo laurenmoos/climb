@@ -97,7 +97,6 @@ class VirtualMachine(Env):
         regs, traces = zip(*compile)
 
         actuals = [trace[-1] for trace in traces]
-        print(f"Actuals {actuals} YS {self.ys}")
         return nrmse(np.array(actuals), self.ys), regs
 
     def arity(self, inst: Inst) -> int:
