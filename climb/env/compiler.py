@@ -1,8 +1,16 @@
 import numpy as np
-from scipy.sparse import coo_matrix
 
-from collections import deque
-from data_models import  Inst
+
+def mod1(x, m):
+    return x % m
+
+
+def iloc(ar, i):
+    return ar[mod1(abs(i), len(ar))]
+
+
+def loc(ar, i):
+    return ar[mod1(abs(i), len(ar))]
 
 
 def execute(code, input_data, out_registers, num_registers, make_trace):
@@ -14,47 +22,39 @@ def execute(code, input_data, out_registers, num_registers, make_trace):
     :param make_trace: boolean indicating whether an execution trace should be collected
     :return: state of output registers after program is executed and optional call stack
     """
-    # now it is evaluating columns of instruction? not sure
     return _execute_vec(code, input_data, num_registers, out_registers, make_trace)
-
-
-def _initialize_with_input(input_data, num_registers, num_data_registers):
-
-    reg = input_data
-    return reg
 
 
 def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
     steps = 0
 
-    call_stack = deque()
+    D = input_data.T
+    R = np.zeros(shape=(D.shape[0], D.shape[1]), dtype=bool)
 
-    regs = _initialize_with_input(input_data, num_registers, out_registers)
+    trace_len = max(1, len(code))
+    trace = {}
 
     for (pc, inst) in enumerate(code):
         # this operation has side effects on regs
-        out = _evaluate_inst_vec(inst, regs)
+        R = _evaluate_inst_vec(inst, R, D)
 
         if make_trace:
-            call_stack.appendleft(out)
+            trace[pc] = R
         steps += 1
 
     # returns the output values of the program and optionally the trace
-    return regs, call_stack
+    return R[out_registers], trace
 
 
-def _evaluate_inst_vec(inst: Inst, regs):
+def _evaluate_inst_vec(inst, r, d):
     # regs is an adjacency list with rows being the source registers and columns the writeable registers
-
+    s_regs = d if inst.src < 0 else r
+    d_regs = r
     if inst.op.arity == 2:
-        args = [loc(inst.dst, regs), loc(inst.src, regs)]
+        args = [loc(d_regs, inst.dst), loc(s_regs, inst.src)]
     elif inst.op.arity == 1:
-        args = [loc(inst.src, regs)]
+        args = [loc(s_regs, inst.src)]
     else:
         args = inst.op.fx([])
-    regs[inst.dst - 1] = inst.op.fx(*args)
-    return regs[inst.dst - 1]
-
-
-def loc(dst, data):
-    return data[abs(dst) % abs(len(data))]
+    d_regs[inst.dst] = inst.op.fx(*args)
+    return d_regs

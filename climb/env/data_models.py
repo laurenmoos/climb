@@ -72,6 +72,7 @@ class CandidateExpression:
         :param program_str: polish notation
         :return: candidate expression
         """
+        #TODO: add an exception as this is a pretty brittle way of doing things
         insts = program_str.split(delimiter)
 
         code = []

@@ -8,29 +8,43 @@ import numpy as np
 
 class Test(TestCase):
 
-    # TODO: this test currently failing due to data issues
-    def test_execute(self):
-        FILE_NAME = "sample.json"
-        file = open(FILE_NAME)
-        actuals = json.load(file)
+    def test_execute_8regs(self):
+        file = open('test_data/sample_8.json')
+        j = json.load(file)
+        c = j["config"]
+        code_length, registers, num_data, out = c["code length"], \
+                                                c["registers"], \
+                                                c["num_data"],  \
+                                                c["out"]
 
-        config = actuals["config"]
+        out = list(map(lambda x: x - 1, out))
+        #lazy and just rewrote code with 0-based indexing
+        code = ';'.join(["mov 3 -7", "xor 2 6", "xor 1 -7", "xor 0 -4", "xor 7 6", "~ 7 6", "| 6 -4", "~ 1 4"])
+        program = CandidateExpression.from_string(code)
+        xs = np.array(j["data"], dtype=bool)
+
+        regs, trace = execute(program, xs, out, registers, True)
+
+        assert np.array_equal(regs, j['results'])
+        file.close()
+
+    def test_execute_2regs(self):
+        file = open("test_data/sample_2.json")
+        j = json.load(file)
+        config = j["config"]
         code_length, registers, num_data, out = config["code length"], \
                                                 config["registers"], \
                                                 config["num_data"],  \
                                                 config["out"]
+        #I hate Julia
+        out = list(map(lambda x: x - 1, out))
+        #lazy and just rewrote code with 0-based indexing
+        code = ";".join(["& 0 0", "xor 0 -1", "| 1 1", "~ 0 0", "xor 0 0", "& 1 -1", "mov 1 0", "~ 1 0"])
+        program = CandidateExpression.from_string(code)
+        xs = np.array(j["data"], dtype=bool)
 
+        regs, trace = execute(program, xs, out, registers, True)
 
-        code = ';'.join(actuals["code"])
-        print(code)
+        assert np.array_equal(regs, j['results'])
 
-        #trace instruction by isntruction
-        program_string = code[0]
-        program = CandidateExpression.from_string(program_string)
-
-        data = actuals["data"]
-        xs = np.array(data, dtype=bool)
-        print(f"Data is {xs} with shape {xs.shape}")
-
-        print(execute(program, xs, out, registers, True))
         file.close()
