@@ -19,7 +19,7 @@ class Test(TestCase):
 
         out = list(map(lambda x: x - 1, out))
         #lazy and just rewrote code with 0-based indexing
-        code = ';'.join(['mov 1 0', 'xor 1 1', '& 1 1', '~ 1 0', 'xor 0 0', '~ 1 1', '& 0 0', '| 1 1'])
+        code = ';'.join(["mov 3 -7", "xor 2 6", "xor 1 -7", "xor 0 -4", "xor 7 6", "~ 7 6", "| 6 -4", "~ 1 4"])
         program = CandidateExpression.from_string(code)
         xs = np.array(j["data"], dtype=bool)
 
