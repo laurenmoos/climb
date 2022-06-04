@@ -1,6 +1,6 @@
 import torch
 import itertools
-from env.data_models import Inst, semantic_intron
+from climb.env.data_models import Inst, semantic_intron
 from torch.nn import functional as F
 
 
@@ -10,10 +10,13 @@ class Task:
     as problem specific characteristics such as max sequence length, function set etc.
     """
 
-    def __init__(self, function_set, num_regs, num_data_regs, dataset, constraints, sequence_length, arity):
+    def __init__(self, function_set: list, num_regs: int, num_data_regs:int, output_regs: list, dataset: str, constraints: list,
+                 sequence_length:int, arity:dict):
+
         self.function_set = function_set
         self.num_regs = num_regs
         self.num_data_regs = num_data_regs
+        self.output_regs = list(output_regs)
         self.dataset = dataset
         self.constraints = constraints
         self.instruction_shape = self.number_of_possible_insts()

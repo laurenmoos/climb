@@ -46,8 +46,7 @@ class PolicyGradient(pl.LightningModule):
         self.steps_per_epoch = self.sequence_length
 
         self.save_hyperparameters()
-
-        self.task = Task(self.function_set, self.n_reg, self.n_data_reg, self.dataset, self.constraints,
+        self.task = Task(self.function_set, self.n_reg, self.n_data_reg, self.out_reg,self.dataset, self.constraints,
                          self.sequence_length, self.arity)
         # TODO: add incremental reward / curiosity type reward based off of a trace RNN
         self.env = VirtualMachine(self.task)
@@ -149,20 +148,17 @@ class PolicyGradient(pl.LightningModule):
         """
         for step in range(self.steps_per_epoch):
             pi, action, log_prob, value = self.agent(self.state.float(), self.device)
-
             next_state, reward, done, _ = self.env.step(action.cpu().numpy())
             self.episode_step += 1
 
             self.batch_states.append(self.state)
             self.batch_actions.append(action)
             self.batch_logp.append(log_prob)
-
             self.ep_rewards.append(reward)
-
             # value is sampled float scalar from the critic network
             self.ep_values.append(value.item())
-            print(f"Next state is {next_state}")
-            self.state = torch.FloatTensor(next_state)
+
+            self.state = next_state
 
             epoch_end = step == (self.steps_per_epoch - 1)
             # has a reward been collected for each instruction added to the sequence
@@ -248,13 +244,13 @@ class PolicyGradient(pl.LightningModule):
         self.log("avg_reward", self.avg_reward, prog_bar=True, on_step=False, on_epoch=True)
 
         if optimizer_idx == 0:
-            loss_actor = self.actor_loss(state, action, old_logp, qval, adv)
+            loss_actor = self.actor_loss(state, action, old_logp, adv)
             self.log('loss_actor', loss_actor, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
             return loss_actor
 
         elif optimizer_idx == 1:
-            loss_critic = self.critic_loss(state, action, old_logp, qval, adv)
+            loss_critic = self.critic_loss(state, qval)
             self.log('loss_critic', loss_critic, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
             return loss_critic

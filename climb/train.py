@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/Users/lauren/climb")
 import pytorch_lightning as pl
 from argparse import ArgumentParser
 import yaml

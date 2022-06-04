@@ -1,4 +1,4 @@
-from constants import op_string_to_ops, OPSTRING, arity_dict
+from climb.env.constants import op_string_to_ops, OPSTRING, arity_dict
 
 
 def semantic_intron(inst) -> bool:

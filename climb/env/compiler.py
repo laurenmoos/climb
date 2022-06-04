@@ -13,7 +13,7 @@ def loc(ar, i):
     return ar[mod1(abs(i), len(ar))]
 
 
-def execute(code, input_data, out_registers, num_registers, make_trace):
+def execute(code, input_data, num_registers, out_registers, make_trace):
     """
     :param code: vector of instructions in prefix notation
     :param input_data: binary input vector with size == number of test_data registers
@@ -22,13 +22,14 @@ def execute(code, input_data, out_registers, num_registers, make_trace):
     :param make_trace: boolean indicating whether an execution trace should be collected
     :return: state of output registers after program is executed and optional call stack
     """
+
     return _execute_vec(code, input_data, num_registers, out_registers, make_trace)
 
 
 def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
     steps = 0
-
     D = input_data.T
+    # TODO: have to handle logic here when data is less than the number of registers
     R = np.zeros(shape=(D.shape[0], D.shape[1]), dtype=bool)
 
     trace_len = max(1, len(code))
@@ -43,7 +44,7 @@ def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
         steps += 1
 
     # returns the output values of the program and optionally the trace
-    return R[out_registers], trace
+    return R[out_registers, out_registers], trace
 
 
 def _evaluate_inst_vec(inst, r, d):

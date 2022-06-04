@@ -1,6 +1,7 @@
-from task import Task
-from data_models import Op, Inst, op_string_to_ops
+from climb.env.task import Task
+from climb.env.data_models import Op, Inst, op_string_to_ops
 from enum import Enum
+from climb.env.linear_vm import VirtualMachine
 
 import numpy as np
 import random
@@ -20,20 +21,24 @@ op_string_to_ops = {OPSTRING.OR: np.bitwise_or, OPSTRING.AND: np.bitwise_and,
                     OPSTRING.MOV: lambda x: x, OPSTRING.IDENTITY: lambda x: x}
 
 ARITY_DICT = {OPSTRING.OR: 2, OPSTRING.AND: 2, OPSTRING.NOT: 1, OPSTRING.MOV: 1, OPSTRING.IDENTITY: 1, OPSTRING.XOR: 2}
-FUNCTION_SET = ["and", "or", "mov", "not", "identity"]
+FUNCTION_SET = ["&", "|", "mov", "~", "identity"]
 
 
 def test_task():
     return Task(
         function_set=FUNCTION_SET,
-        num_input_regs=4,
-        num_output_regs=4,
-        dataset="task/6-bit-parity.csv",
-        constraints=[],
+        num_regs=7,
+        num_data_regs=7,
+        output_regs= [6],
+        dataset="test_data/6-bit-parity.csv",
+        constraints = [],
         sequence_length=100,
         arity=ARITY_DICT
     )
 
+def test_linear_vm():
+    task = test_task()
+    return VirtualMachine(task)
 
 def random_inst(input_registers: int, num_data=1) -> Inst:
     input_registers = range(1, input_registers)

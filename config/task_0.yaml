@@ -8,7 +8,7 @@
   "num_registers": 7
   "dataset" : "task/6-bit-parity.csv" #this is a series of inputs X and outputs Y (mixed arity)
   "constraints": []
-  "sequence_length": 100
+  "sequence_length": 8
 
 "policy_gradient_algo":
     "gamma": 0.99
