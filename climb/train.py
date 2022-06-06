@@ -40,7 +40,7 @@ if __name__ == "__main__":
     model = PolicyGradient(config)
     trainer = pl.Trainer(
         gpus=0,
-        max_epochs=10000
+        max_epochs=1000
     )
 
     trainer.fit(model)

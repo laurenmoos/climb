@@ -6,7 +6,9 @@ class TestVirtualMachine(TestCase):
 
     def test_step(self):
         vm = test_linear_vm()
-        vm.step()
+        vm.reset()
+        for step in range(vm.task.sequence_length):
+            vm.step(1)
 
     def test_reward_for_program_state(self):
         vm = test_linear_vm()

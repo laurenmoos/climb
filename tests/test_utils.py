@@ -32,7 +32,7 @@ def test_task():
         output_regs= [6],
         dataset="test_data/6-bit-parity.csv",
         constraints = [],
-        sequence_length=100,
+        sequence_length=8,
         arity=ARITY_DICT
     )
 

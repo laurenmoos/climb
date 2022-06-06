@@ -3,7 +3,7 @@ import torch
 import pytorch_lightning as pl
 import torch.optim as optim
 from .experience_source_dataset import ExperienceSourceDataset
-from .networks import create_mlp, ActorCriticAgent, ActorCategorical
+from .networks import ActorCategoricalRNN, CriticRNN, create_rnn, create_mlp, ActorCriticAgent, ActorCategorical
 from env.task import Task
 from env.linear_vm import VirtualMachine
 
@@ -30,6 +30,8 @@ class PolicyGradient(pl.LightningModule):
 
         self.lr_actor = float(rl_config['lr_actor'])
         self.lr_critic = float(rl_config['lr_critic'])
+        self.embedding_size = int(rl_config["embedding_size"])
+        self.hidden_dim_n = int(rl_config["hidden_dim_n"])
 
         # a task parameterizes candidate programs via its architecture, function set, and ultimately its dataset
         self.task_config = config["task"]
@@ -52,14 +54,12 @@ class PolicyGradient(pl.LightningModule):
         self.env = VirtualMachine(self.task)
 
         # TODO: while this will likely remain an MLP, it deserves a bit more thought
-        input_shape = (self.task.instruction_shape,)
+        input_shape = (self.sequence_length,)
         # critic sampling a random action from the distribution formed by the inner state of the (currently) MLP model
-        self.critic = create_mlp(input_shape, 1)
+        self.critic = CriticRNN(self.task.vocab, self.embedding_size, self.hidden_dim_n, self.sequence_length, 1)
 
-        # TODO: replace this with a recurrent policy model
-        input_shape = (self.task.instruction_shape,)
-        actor_model = create_mlp(input_shape, len(self.env.action_space))
-        self.actor = ActorCategorical(actor_model)
+        # TODO: replace this with a recurent policy model
+        self.actor = ActorCategoricalRNN(self.task.vocab, self.embedding_size, self.hidden_dim_n, self.sequence_length,self.task.vocab)
 
         self.agent = ActorCriticAgent(self.actor, self.critic)
 
@@ -147,7 +147,9 @@ class PolicyGradient(pl.LightningModule):
         associated with the task
         """
         for step in range(self.steps_per_epoch):
-            pi, action, log_prob, value = self.agent(self.state.float(), self.device)
+            pi, action, log_prob, value = self.agent(self.state.to(torch.int64), self.device)
+
+            print(f"Pi {pi} Action {action} Log Prob {log_prob} Value {value} ")
             next_state, reward, done, _ = self.env.step(action.cpu().numpy())
             self.episode_step += 1
 

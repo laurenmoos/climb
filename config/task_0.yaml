@@ -16,6 +16,8 @@
     "entropy_beta": 9
     "avg_reward_len": 1
     "epoch_len": 2048
+    "embedding_size": 4
+    "hidden_dim_n": 8
     "lr_actor": 3e-4
     "lr_critic": 1e-3
     "nb_optim_iters": 4

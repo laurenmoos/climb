@@ -8,6 +8,63 @@ from typing import Union, Tuple
 from torch.distributions import Categorical, Normal
 
 
+def create_rnn(vocab_size, embedding_dim, hidden_size, n_layers, output_size):
+    net_layers = []
+    net_layers.append(nn.Embedding(vocab_size, embedding_dim))
+    net_layers.append(nn.RNN(embedding_dim, hidden_size, n_layers))
+    return nn.Sequential(*net_layers)
+
+
+class CriticRNN(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, n_layers, output_size):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.output_size = output_size
+
+        self.rnn = create_rnn(vocab_size, embedding_dim, hidden_dim, n_layers, output_size)
+
+        self.act = nn.ReLU()
+
+    def forward(self, states):
+        logits, _ = self.rnn.forward(states)
+        dense = nn.Linear(self.hidden_dim, self.output_size)
+
+        return dense
+
+
+class ActorCategoricalRNN(nn.Module):
+
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, n_layers, output_size):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.output_size = output_size
+
+        self.rnn = create_rnn(vocab_size, embedding_dim, hidden_dim, n_layers, output_size)
+
+        self.act = nn.ReLU()
+
+    def forward(self, states):
+        logits, _ = self.rnn.forward(states)
+        dense = nn.Linear(self.hidden_dim, self.output_size)
+        print(f"Shape of outputted value prior to distribution {dense(logits).shape}")
+        pi = Categorical(logits=dense(logits))
+        actions = pi.sample()
+
+        return pi, actions
+
+    def get_log_prob(self, pi: Categorical, actions: torch.Tensor):
+        """
+        Takes in a distribution and actions and returns log prob of actions
+        under the distribution
+        Args:
+            pi: torch distribution
+            actions: actions taken by distribution
+        Returns:
+            log probability of the acition under pi
+        """
+        return pi.log_prob(actions)
+
+
 def create_mlp(input_shape: Tuple[int], n_actions: int, hidden_sizes: list = [128, 128]):
     """
     Simple Multi-Layer Perceptron network
@@ -34,7 +91,7 @@ class ActorCategorical(nn.Module):
         self.actor_net = actor_net
 
     def forward(self, states):
-        logits = self.actor_net(states.float())
+        logits = self.actor_net(states)
         pi = Categorical(logits=logits)
         actions = pi.sample()
 
@@ -77,11 +134,9 @@ class ActorCriticAgent(object):
         """
 
         state = state.to(device=device)
-
         pi, actions = self.actor_net(state)
         log_p = self.get_log_prob(pi, actions)
-
-        value = self.critic_net(state.float())
+        value = self.critic_net(state)
 
         return pi, actions, log_p, value
 

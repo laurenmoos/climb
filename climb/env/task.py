@@ -19,7 +19,7 @@ class Task:
         self.output_regs = list(output_regs)
         self.dataset = dataset
         self.constraints = constraints
-        self.instruction_shape = self.number_of_possible_insts()
+        self.vocab = self.number_of_possible_insts()
         self.inst_to_vec, self.vec_to_inst = self.index_mappings()
         self.sequence_length = sequence_length
         self.arity = arity
@@ -44,16 +44,16 @@ class Task:
         """
         :return: number of possible instructions given the machine architecture and the function set
         """
-        return self.num_regs * (self.num_regs + self.num_data_regs) * len( self.function_set)
+        return int(self.num_regs * (self.num_regs + self.num_data_regs) * len( self.function_set))
 
     # TODO: improve the instruction embedding
     def inst_to_onehot(self, inst_offset: int):
         """
         :return: naive one-hot encoded embedding of any possible instruction given the task
         """
-        one_hot = F.one_hot(torch.tensor(inst_offset), num_classes=self.instruction_shape)
+        one_hot = F.one_hot(torch.tensor(inst_offset), num_classes=self.vocab)
         one_hot = one_hot.type(torch.FloatTensor)
-        return torch.tensor(one_hot, dtype=torch.float)
+        return torch.tensor(one_hot, dtype=torch.bool)
 
     @staticmethod
     def constraint(action):

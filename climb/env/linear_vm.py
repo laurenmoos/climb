@@ -19,12 +19,11 @@ class VirtualMachine(Env):
     def __init__(self, task: Task):
         super(VirtualMachine, self).__init__()
 
-        self.program_state = []
         self.task = task
 
         # most naive observation is just the previous instruction
-        self.observation_shape = task.instruction_shape
-        self.observation_space = np.ones(self.observation_shape)
+        self.observation_shape = (task.sequence_length,)
+        self.observation_space = torch.zeros(self.observation_shape, dtype=torch.int64)
 
         self.action_space = task.vec_to_inst
 
@@ -53,17 +52,19 @@ class VirtualMachine(Env):
         self.xs, self.ys = df[df.columns[:self.n_in_regs]].to_numpy(), \
                            df[df.columns[-(self.n_out_regs + 1):- self.n_out_regs]].to_numpy()
 
-        self.interaction_matrix = [1] * len(self.ys)
+        self.correct_examples = []
+        self.incorrect_examples = []
+
 
         assert len(self.xs) == len(self.ys)
 
     def step(self, instruction_offset: int):
         episode_terminated = False
 
-        one_hot_encoded_action = self.task.inst_to_onehot(instruction_offset)
+        print(f"Type of instruction offset {instruction_offset} with shape {instruction_offset.shape}")
+        self.observation_space[self.sequence_length - self.steps_left] = instruction_offset
 
         instruction = self.action_space[int(instruction_offset)]
-        self.program_state.append(instruction)
 
         if not self.task.constraint(instruction):
             # the action is invalid, and we do not return it as part of the episode
@@ -82,15 +83,14 @@ class VirtualMachine(Env):
 
         # the next state is the next subsequence or the action that was selected from the model
         #TODO: right now this is returning only the last action
-        return one_hot_encoded_action, self.episode_reward, episode_terminated, []
+        return self.observation_space, self.episode_reward, episode_terminated, []
 
     def reset(self):
         self.episode_reward = 0
-        self.program_state = []
 
         # return the initial set of observations (vector with observation_shape number of empty
         # instructions
-        return torch.zeros(self.observation_shape, dtype=torch.float)
+        return torch.zeros(size=(512, self.sequence_length), dtype=torch.int)
 
     def reward_for_program_state(self):
         """
@@ -106,14 +106,20 @@ class VirtualMachine(Env):
             compiled.append(regs)
 
         incorrect_examples = []
-        for i,n in enumerate(self.ys):
+        total_correct = 0
+        for i, n in enumerate(self.ys):
             r = np.bitwise_xor(np.array(n, dtype=bool), compiled[i])
             # should be 0 for identity
             if not r:
-                self.episode_reward += self.interaction_matrix[i] * 1
+                total_correct += 1
+                if i not in self.correct_examples:
+                    self.episode_reward += (1 * (1 / (self.steps_left + 1)))
+                    self.correct_examples.append(i)
             else:
-                self.interaction_matrix[i] += 0.1
-                incorrect_examples.append(i)
+                if i in self.incorrect_examples:
+                    self.episode_reward -= 1
+                else:
+                    self.incorrect_examples.append(i)
 
         return float(self.episode_reward)
 
