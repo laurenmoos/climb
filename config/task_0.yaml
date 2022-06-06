@@ -15,7 +15,7 @@
     "batch_size": 512
     "entropy_beta": 9
     "avg_reward_len": 1
-    "epoch_len": 2048
+    "epoch_len": 1000
     "lr_actor": 3e-4
     "lr_critic": 1e-3
     "nb_optim_iters": 4

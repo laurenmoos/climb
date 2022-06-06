@@ -53,8 +53,6 @@ class VirtualMachine(Env):
         self.xs, self.ys = df[df.columns[:self.n_in_regs]].to_numpy(), \
                            df[df.columns[-(self.n_out_regs + 1):- self.n_out_regs]].to_numpy()
 
-        self.interaction_matrix = [1] * len(self.ys)
-
         assert len(self.xs) == len(self.ys)
 
     def step(self, instruction_offset: int):
@@ -81,7 +79,7 @@ class VirtualMachine(Env):
             episode_terminated = True
 
         # the next state is the next subsequence or the action that was selected from the model
-        #TODO: right now this is returning only the last action
+        # TODO: right now this is returning only the last action
         return one_hot_encoded_action, self.episode_reward, episode_terminated, []
 
     def reset(self):
@@ -105,17 +103,14 @@ class VirtualMachine(Env):
             regs, trace = execute(self.program_state, input_data, self.n_in_regs, self.out_regs, True)
             compiled.append(regs)
 
-        incorrect_examples = []
-        for i,n in enumerate(self.ys):
+        total_correct = 0
+        for i, n in enumerate(self.ys):
             r = np.bitwise_xor(np.array(n, dtype=bool), compiled[i])
             # should be 0 for identity
             if not r:
-                self.episode_reward += self.interaction_matrix[i] * 1
-            else:
-                self.interaction_matrix[i] += 0.1
-                incorrect_examples.append(i)
+                total_correct += 1
 
-        return float(self.episode_reward)
+        return float(total_correct)
 
     def arity(self, inst: Inst) -> int:
         return self.task.arity[inst.op]
