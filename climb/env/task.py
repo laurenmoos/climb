@@ -30,7 +30,7 @@ class Task:
         note: this is for a very simple one-hot embedding approach
         """
         #TODO: this should be all regsiters times the number of executable regs - maybe minus introns
-        a = [range(self.num_regs), range(self.num_data_regs), self.function_set]
+        a = [range(-self.num_data_regs, self.num_data_regs), range(self.num_regs),  self.function_set]
         instructions = list(itertools.product(*a))
 
         l, m = {}, {}

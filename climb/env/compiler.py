@@ -29,8 +29,7 @@ def execute(code, input_data, num_registers, out_registers, make_trace):
 def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
     steps = 0
     D = input_data.T
-    # TODO: have to handle logic here when data is less than the number of registers
-    R = np.zeros(shape=(D.shape[0], D.shape[1]), dtype=bool)
+    R = np.zeros(shape=(D.shape), dtype=bool)
 
     trace_len = max(1, len(code))
     trace = {}
@@ -44,7 +43,7 @@ def _execute_vec(code, input_data, num_registers, out_registers, make_trace):
         steps += 1
 
     # returns the output values of the program and optionally the trace
-    return R[out_registers, out_registers], trace
+    return R[out_registers], trace
 
 
 def _evaluate_inst_vec(inst, r, d):

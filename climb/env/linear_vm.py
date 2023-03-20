@@ -91,25 +91,16 @@ class VirtualMachine(Env):
         return torch.zeros(self.observation_shape, dtype=torch.float)
 
     def reward_for_program_state(self):
-        """
-        :return: compiled linear program with each of the dataset inputs and evaluate the nrmse of actuals and
-        dataset outputs
-        """
-        # assume all registers are writeable for now
         compiled = []
-        for inp in self.xs:
-            input_data = np.zeros(shape=(self.n_in_regs, self.task.num_data_regs))
-            input_data[0, :self.n_in_regs] = inp
-            regs, trace = execute(self.program_state, input_data, self.n_in_regs, self.out_regs, True)
+        for i, inp in enumerate(self.xs):
+            regs, trace = execute(self.program_state, np.array(inp, dtype=bool), self.n_in_regs, self.out_regs, True)
             compiled.append(regs)
 
         total_correct = 0
         for i, n in enumerate(self.ys):
-            r = np.bitwise_xor(np.array(n, dtype=bool), compiled[i])
             # should be 0 for identity
-            if not r:
+            if not np.bitwise_xor(np.array(n, dtype=bool), compiled[i]):
                 total_correct += 1
-
         return float(total_correct)
 
     def arity(self, inst: Inst) -> int:

@@ -22,8 +22,7 @@ class Test(TestCase):
         code = ';'.join(["mov 3 -7", "xor 2 6", "xor 1 -7", "xor 0 -4", "xor 7 6", "~ 7 6", "| 6 -4", "~ 1 4"])
         program = CandidateExpression.from_string(code)
         xs = np.array(j["data"], dtype=bool)
-
-        regs, trace = execute(program, xs, out, registers, True)
+        regs, trace = execute(program, xs, registers, out, True)
 
         assert np.array_equal(regs, j['results'])
         file.close()
